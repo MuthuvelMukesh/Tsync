@@ -1,0 +1,56 @@
+name: Tsync Daily Intelligence Report
+
+on:
+  schedule:
+    # Run daily at 06:00 UTC
+    - cron: '0 6 * * *'
+  workflow_dispatch:  # Manual trigger
+
+permissions:
+  contents: write
+
+jobs:
+  generate-report:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Intelligence Pipeline
+        env:
+          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: python main.py
+
+      - name: Upload report artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: intelligence-report-${{ github.run_number }}
+          path: |
+            report.html
+            styles.css
+            report.txt
+          retention-days: 30
+
+      - name: Commit report to repo
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          mkdir -p reports
+          cp report.html reports/report-$(date +%Y-%m-%d).html
+          cp styles.css reports/styles.css
+          cp report.txt reports/report-$(date +%Y-%m-%d).txt
+          git add reports/
+          git diff --staged --quiet || git commit -m "📊 Daily intelligence report — $(date +%Y-%m-%d)"
+          git push
