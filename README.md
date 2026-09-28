@@ -1,222 +1,270 @@
-# Tsync — Telegram Intelligence Engine
+# Tsync — Modular Intelligence & Incident Tracking Engine
 
-A production-ready, modular system that collects messages from Telegram channels, processes them through a hybrid AI pipeline, and generates clean intelligence reports.
-
-![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python)
-![License](https://img.shields.io/badge/License-MIT-green)
-![Status](https://img.shields.io/badge/Status-Production_Ready-brightgreen)
+A production-grade, modular, layered, and independently testable intelligence engine. Collects messages from multiple sources (Telegram, RSS, APIs), normalizes and scores them, clusters them into evolving incidents, enriches them with AI intelligence, and delivers multi-channel digests and real-time alerts.
 
 ---
 
-## ⚡ Features
+## 🏗️ Architecture & Separation of Concerns
 
-- **Telegram Ingestion** — Collects messages from configured channels via Telethon
-- **Hybrid Categorization** — Rule-based first, AI fallback only when needed
-- **Dynamic Selection** — Adaptive thresholds (no fixed Top-N limits)
-- **Intelligence Generation** — AI-powered What + Why analysis for selected items
-- **Trend Detection** — N-gram analysis for trending topics and patterns
-- **Beautiful Reports** — Dark-themed HTML + plain text output
-- **Freemium Optimized** — Minimal API usage through smart filtering
+Tsync strictly follows **Clean Architecture, Dependency Inversion, and Separation of Concerns**:
+
+```
+                       ┌─────────────────────────┐
+                       │      Domain Layer       │
+                       │ (Pure Entities & Events)│
+                       └────────────▲────────────┘
+                                    │
+                       ┌────────────┴────────────┐
+                       │     Services Layer      │
+                       │ (Orchestrators & Rules) │
+                       └────────────▲────────────┘
+                                    │
+                       ┌────────────┴────────────┐
+                       │     Workflows Layer     │
+                       │   (Pipeline Sequences)  │
+                       └────────────▲────────────┘
+                                    │
+         ┌──────────────────────────┼──────────────────────────┐
+         │                          │                          │
+┌────────┴────────┐        ┌────────┴────────┐        ┌────────┴────────┐
+│  Ingestion      │        │  Storage        │        │ Notifications   │
+│  (Telethon/RSS) │        │  (PostgreSQL/   │        │ (WhatsApp/      │
+│                 │        │   SQLite Async) │        │  Telegram Bot)  │
+└─────────────────┘        └─────────────────┘        └─────────────────┘
+```
+
+### Key Architectural Invariants
+1. **Domain Independence**: The `app/domain` package imports ZERO external frameworks, database ORMs, or network libraries (`SQLAlchemy`, `httpx`, `Telethon`, `OpenRouter`, `os.getenv`).
+2. **Repository Abstractions**: All persistence is accessed via protocols (`MessageRepository`, `IncidentRepository`, `SourceRepository`, `EntityRepository`). The engine runs equally against SQLite, PostgreSQL, or test mocks.
+3. **Pluggable AI & Ingestion**: External providers (`OpenRouter`, `Telegram`) implement clean interfaces (`AIProvider`, `MessageSource`).
+4. **Policy-Driven Notifications**: Notification decisions (`NotificationPolicy`) are decoupled from delivery adapters (`WhatsAppNotificationProvider`, `TelegramNotificationProvider`).
+5. **Thin Adapters**: The Telegram bot and CLI scripts are thin adapters delegating all business operations to services.
 
 ---
 
-## 🏗️ Architecture
+## 📂 Target Structure
 
-```
-Telegram Channels
-       │
-       ▼
-┌─────────────┐
-│  Ingestion   │  ← Telethon (user client)
-│  (telethon)  │
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│  Filtering   │  ← Spam, dedup, short messages
-│  (rules.py)  │
-└──────┬──────┘
-       │
-       ▼
-┌─────────────────┐
-│  Categorization  │  ← Rule-based → AI fallback
-│  (hybrid)        │
-└──────┬──────────┘
-       │
-       ▼
-┌─────────────┐
-│  Scoring     │  ← Heuristic importance (0–10)
-│  (scorer.py) │
-└──────┬──────┘
-       │
-       ▼
-┌──────────────┐
-│  Selection    │  ← Adaptive threshold (5–15 items)
-│  (selector)   │
-└──────┬───────┘
-       │
-       ▼
-┌──────────────────┐
-│  AI Intelligence  │  ← Only for selected items
-│  (OpenRouter)     │
-└──────┬───────────┘
-       │
-       ▼
-┌─────────────┐
-│  Report Gen  │  ← HTML + Text output
-│  (Jinja2)    │
-└─────────────┘
-```
-
----
-
-## 📦 Quick Start
-
-### 1. Clone & Install
-
-```bash
-git clone https://github.com/your-username/Tsync.git
-cd Tsync
-pip install -r requirements.txt
-```
-
-### 2. Configure
-
-```bash
-cp .env.example .env
-# Edit .env with your API credentials
-```
-
-Get your credentials:
-- **Telegram**: [my.telegram.org](https://my.telegram.org) → API Development Tools
-- **OpenRouter**: [openrouter.ai](https://openrouter.ai) → API Keys
-
-### 3. Add Channels
-
-```bash
-python main.py --add-channel techcrunch
-python main.py --add-channel finance_news
-python main.py --channels  # List all
-```
-
-### 4. Run
-
-```bash
-# Full pipeline (Telegram + Processing)
-python main.py
-
-# Demo mode (sample data, no Telegram needed)
-python main.py --demo
-
-# Process-only mode (skip ingestion)
-python main.py --process
-```
-
----
-
-## 🖥️ Demo Mode
-
-Run without Telegram credentials to see the system in action:
-
-```bash
-python main.py --demo
-```
-
-This inserts 15 realistic sample messages and runs the full pipeline, generating both HTML and text reports.
-
----
-
-## 📂 Project Structure
-
-```
-Tsync/
-├── main.py              # Pipeline orchestrator + CLI
-├── telegram_client.py   # Telethon-based message collector
-├── ai_processor.py      # OpenRouter AI fallback processor
-├── rules.py             # Rule-based categorization engine
-├── scorer.py            # Heuristic importance scorer
-├── selector.py          # Dynamic message selector
-├── trends.py            # Trend detection & analysis
-├── database.py          # SQLite storage layer
-├── report.py            # HTML/Text report generator
-├── templates/
-│   ├── report.html      # Jinja2 HTML template
-│   └── styles.css       # Dark theme stylesheet
-├── config.json          # Channel & pipeline config
-├── .env.example         # Environment variables template
-├── requirements.txt     # Python dependencies
-├── .github/
+```text
+tsync/
+│
+├── app/
+│   ├── __init__.py
+│   ├── config/
+│   │   ├── __init__.py
+│   │   └── settings.py
+│   ├── domain/
+│   │   ├── __init__.py
+│   │   ├── entities.py
+│   │   ├── incidents.py
+│   │   ├── messages.py
+│   │   ├── claims.py
+│   │   └── events.py
+│   ├── ingestion/
+│   │   ├── __init__.py
+│   │   ├── base.py
+│   │   ├── telegram.py
+│   │   └── service.py
+│   ├── processing/
+│   │   ├── __init__.py
+│   │   ├── filtering.py
+│   │   ├── normalization.py
+│   │   ├── categorization.py
+│   │   └── scoring.py
+│   ├── incidents/
+│   │   ├── __init__.py
+│   │   ├── detector.py
+│   │   ├── matcher.py
+│   │   ├── updater.py
+│   │   ├── clustering.py
+│   │   ├── timeline.py
+│   │   ├── contradictions.py
+│   │   └── relationships.py
+│   ├── intelligence/
+│   │   ├── __init__.py
+│   │   ├── analyzer.py
+│   │   ├── summarizer.py
+│   │   ├── entities.py
+│   │   ├── confidence.py
+│   │   └── prompts.py
+│   ├── ai/
+│   │   ├── __init__.py
+│   │   ├── base.py
+│   │   ├── openrouter.py
+│   │   ├── models.py
+│   │   └── retry.py
+│   ├── storage/
+│   │   ├── __init__.py
+│   │   ├── database.py
+│   │   ├── models.py
+│   │   └── repositories/
+│   │       ├── messages.py
+│   │       ├── incidents.py
+│   │       ├── sources.py
+│   │       ├── entities.py
+│   │       └── notifications.py
+│   ├── notifications/
+│   │   ├── __init__.py
+│   │   ├── base.py
+│   │   ├── whatsapp.py
+│   │   ├── telegram.py
+│   │   └── dispatcher.py
+│   ├── bots/
+│   │   ├── __init__.py
+│   │   ├── telegram/
+│   │   │   ├── bot.py
+│   │   │   ├── handlers.py
+│   │   │   ├── commands.py
+│   │   │   └── auth.py
+│   │   └── common/
+│   │       └── formatting.py
+│   ├── reports/
+│   │   ├── __init__.py
+│   │   ├── hourly.py
+│   │   ├── daily.py
+│   │   └── formatters.py
+│   ├── services/
+│   │   ├── __init__.py
+│   │   ├── incident_service.py
+│   │   ├── search_service.py
+│   │   ├── briefing_service.py
+│   │   └── status_service.py
 │   └── workflows/
-│       └── daily_report.yml  # Automated daily execution
+│       ├── __init__.py
+│       ├── hourly.py
+│       ├── breaking.py
+│       └── backfill.py
+│
+├── scripts/
+│   ├── hourly.py
+│   ├── bot.py
+│   └── migrate.py
+│
+├── tests/
+│   ├── unit/
+│   │   ├── domain/
+│   │   ├── incidents/
+│   │   ├── intelligence/
+│   │   ├── processing/
+│   │   └── services/
+│   ├── integration/
+│   │   ├── storage/
+│   │   ├── telegram/
+│   │   ├── whatsapp/
+│   │   └── ai/
+│   └── e2e/
+│       └── incident_lifecycle/
+│
+├── migrations/
+│   └── init_schema.sql
+├── config/
+│   └── channels.json
+├── requirements.txt
+├── .env.example
+├── Dockerfile
 └── README.md
 ```
 
 ---
 
-## ⚙️ Configuration
+## ⚡ Quick Start
 
-### config.json
-
-| Field | Description | Default |
-|---|---|---|
-| `channels` | Telegram channel usernames | `[]` |
-| `message_limit` | Max messages per channel | `100` |
-| `importance_threshold` | Base score threshold | `7` |
-| `min_items` | Minimum selected items | `5` |
-| `max_items` | Maximum selected items | `15` |
-| `min_message_length` | Skip messages shorter than | `30` |
-
-### .env
-
-| Variable | Description |
-|---|---|
-| `TELEGRAM_API_ID` | Telegram API ID |
-| `TELEGRAM_API_HASH` | Telegram API Hash |
-| `OPENROUTER_API_KEY` | OpenRouter API Key |
-
----
-
-## 📊 Intelligence Output
-
-Each selected item includes:
-
-| Field | Description |
-|---|---|
-| **Headline** | Concise, impactful title |
-| **What** | Factual summary (2–3 sentences) |
-| **Why It Matters** | Impact and implications |
-| **Category** | technology, finance, geopolitics, etc. |
-| **Score** | Importance rating (0–10) |
-| **Source** | Telegram channel |
-
----
-
-## 🔄 CLI Reference
+### 1. Installation
 
 ```bash
-python main.py                          # Full pipeline
-python main.py --demo                   # Demo with sample data
-python main.py --process                # Process without ingestion
-python main.py --channels               # List channels
-python main.py --add-channel <name>     # Add channel
-python main.py --remove-channel <name>  # Remove channel
-python main.py --help                   # Show help
+git clone https://github.com/MuthuvelMukesh/Tsync.git
+cd Tsync
+pip install -r requirements.txt
+```
+
+### 2. Configure Environment
+
+Copy `.env.example` to `.env`:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with your credentials:
+- `DATABASE_URL`: `sqlite+aiosqlite:///./tsync.db` (default local) or `postgresql+asyncpg://user:pass@host:5432/tsync`
+- `OPENROUTER_API_KEY`: Key from [openrouter.ai](https://openrouter.ai)
+- `TELEGRAM_API_ID` & `TELEGRAM_API_HASH`: From [my.telegram.org](https://my.telegram.org)
+- `TELEGRAM_BOT_TOKEN`: From [@BotFather](https://t.me/BotFather)
+- `WHATSAPP_ACCESS_TOKEN` & `WHATSAPP_PHONE_NUMBER_ID`: From Meta Cloud API
+
+### 3. Initialize Database
+
+```bash
+python scripts/migrate.py
+# or
+python main.py --migrate
+```
+
+### 4. Run Workflows
+
+```bash
+# Demo mode (zero external credentials required)
+python main.py --demo
+
+# Standard hourly intelligence cycle (ingestion + incident matching + reporting)
+python main.py
+
+# Start the Telegram Bot daemon
+python main.py --bot
+# or
+python scripts/bot.py
 ```
 
 ---
 
-## 🤖 GitHub Actions
+## 🔄 Incident Lifecycle
 
-The included workflow runs daily at 06:00 UTC:
+```
+NEW
+ │  (single source / initial event)
+ ▼
+DEVELOPING
+ │  ├── multi-source corroboration
+ │  ├── new claims extracted
+ │  ├── contradiction detected
+ │  └── escalation of impact score
+ ▼
+MONITORING
+ │  (active tracking of stabilized situation)
+ ▼
+RESOLVED
+ │  (official closure / stabilized)
+ ▼
+ARCHIVED
+```
 
-1. Set repository secrets: `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`, `OPENROUTER_API_KEY`
-2. Reports are committed to `reports/` directory
-3. Also available as downloadable artifacts
+---
 
-Trigger manually via **Actions → Tsync Daily Intelligence Report → Run workflow**.
+## 🧪 Test Suite
+
+Run the full suite of unit, integration, and end-to-end tests:
+
+```bash
+pytest tests -v
+```
+
+All 56 tests execute across:
+- **Unit**: Domain lifecycle, incidents, intelligence, processing, scoring, and services.
+- **Integration**: Repositories with in-memory SQLite, Telegram/WhatsApp HTTP adapters, OpenRouter adapter.
+- **E2E**: Full incident lifecycle from message arrival through multi-source progression, timeline compilation, and digest generation.
+
+---
+
+## 🐳 Docker Deployment
+
+Build and run containerized:
+
+```bash
+docker build -t tsync .
+docker run --env-file .env tsync
+```
 
 ---
 
 ## 📄 License
 
-MIT License
+MIT License.

@@ -53,3 +53,6 @@ Thumbs.db
 *.html
 report.txt
 report.html
+
+# Pytest
+.pytest_cache/
